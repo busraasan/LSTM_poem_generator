@@ -56,6 +56,3 @@ class DataHandler():
             batches.append([X[i:i+batch_size, :], Y[i:i+batch_size, :]])
         #batches' shape = (459, 2, 16, 32) -> 459: num_of_batches, 2: X and Y, 16: batch_size, 32: seq_size
         return np.asarray(batches)
-
-# handler = DataHandler('shakespeare.txt')
-# print(handler.batcher().shape)

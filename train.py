@@ -68,10 +68,6 @@ def predict_text(model, words, top_k=5):
         x_i = torch.tensor([[handler.word_embedder(w)]]).to(device)
         output, (h, c) = model(x_i, (h, c))
     
-    # _, top_x_i = torch.topk(output[0], k=1)
-    # choices = top_x_i.tolist()
-    # choice = choices[0]
-
     top_x_i = torch.argmax(output[0])
     top_x_i = top_x_i.item()
 
