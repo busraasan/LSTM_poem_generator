@@ -19,14 +19,13 @@ lr = opt.lr
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 #Parameters for NN
-embedding_vector_dim = 32
+embedding_vector_dim = 64 #seq_size
 
-handler = DataHandler('shakespeare.txt', batch_size=batch_size)
-model = LSTM(num_of_samples=len(handler.embeddings), feature_size=embedding_vector_dim, lstm_size=32)
+handler = DataHandler('shakespeare.txt', batch_size=batch_size, seq_size=embedding_vector_dim)
+model = LSTM(num_of_samples=len(handler.embeddings), lstm_size=64)
 model = model.to(device)
 loss_function = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
 
 def train(model):
     iteration = 0
@@ -55,76 +54,41 @@ def train(model):
                 print(f'Loss: [{loss.item()}]')
 
         print(f'Epoch [{epoch + 1}/{epochs}]')
-        
 
-def predict_text(model, input_string, next_words=100):
-
+def predict_text(model, words, top_k=5):
     model.eval()
+
     h, c = torch.zeros(1, 1, model.lstm_size), torch.zeros(1, 1, model.lstm_size)
     h = h.to(device)
     c = c.to(device)
 
-    parsed_input = handler.word_parser(input_string)
-    input_embeddings = torch.tensor([[[handler.word_embedder(w) for w in parsed_input]]])
-    generated_text = []
-    for i in range(len(input_embeddings[0][0].tolist())):
-        generated_text.append(input_embeddings[0][0].tolist()[i])
-
-    for embedding in input_embeddings:
-        x_i = embedding.clone().detach()
-        x_i = x_i.to(device)
-        output, (h,c) = model(x_i, (h,c))
-
-
-    print(output[0][-1].cpu().detach().numpy())
-    pred = np.argmax(output[0][-1].cpu().detach().numpy())
-    print("pred indices: ", pred)
-    generated_text.append(pred)
-    current_pred = pred
-    
-    for _ in range(next_words):
-        print("predicting..")
-        x_i = torch.tensor([[current_pred]]).to(device)
-        output, (h,c) = model(x_i, (h,c))
-        current_pred = np.argmax(output[0][-1].cpu().detach().numpy())
-        generated_text.append(current_pred)
-
-    print("generateeee<3")
-    print(generated_text)
-    decoded_text = [handler.word_decoder(w) for w in generated_text]
-    print(' '.join(decoded_text))
-
-def generate_text(model, words, top_k=5):
-    model.eval()
-
-    state_h, state_c = torch.zeros(1, 1, model.lstm_size), torch.zeros(1, 1, model.lstm_size)
-    state_h = state_h.to(device)
-    state_c = state_c.to(device)
-
     words = handler.word_parser(words)
 
     for w in words:
-        ix = torch.tensor([[handler.word_embedder(w)]]).to(device)
-        output, (state_h, state_c) = model(ix, (state_h, state_c))
+        x_i = torch.tensor([[handler.word_embedder(w)]]).to(device)
+        output, (h, c) = model(x_i, (h, c))
     
-    _, top_ix = torch.topk(output[0], k=top_k)
-    choices = top_ix.tolist()
-    choice = np.random.choice(choices[0])
+    # _, top_x_i = torch.topk(output[0], k=1)
+    # choices = top_x_i.tolist()
+    # choice = choices[0]
 
-    words.append(handler.word_decoder(choice))
+    top_x_i = torch.argmax(output[0])
+    top_x_i = top_x_i.item()
+
+    words.append(handler.word_decoder(top_x_i))
     
     for _ in range(100):
-        ix = torch.tensor([[choice]]).to(device)
-        output, (state_h, state_c) = model(ix, (state_h, state_c))
+        x_i = torch.tensor([[top_x_i]]).to(device)
+        output, (h, c) = model(x_i, (h, c))
 
         _, top_ix = torch.topk(output[0], k=top_k)
         choices = top_ix.tolist()
-        choice = np.random.choice(choices[0])
-        words.append(handler.word_decoder(choice))
+        top_x_i = np.random.choice(choices[0])
+        words.append(handler.word_decoder(top_x_i))
 
     print(' '.join(words))
 
 
 if __name__ == "__main__":
     train(model)
-    generate_text(model, "You are all resolved rather to die than to famish?")
+    predict_text(model, "It shall be resolved")
